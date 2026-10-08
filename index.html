@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trendline | Follow the trend</title>
+<link rel="icon" href="trendline-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #172A2E;
+    --muted: #4A5F63;
+    /* yellow → green → blue → green → yellow */
+    --grad: linear-gradient(90deg, #F5E96E 0%, #8EDDB0 25%, #5CC6EA 50%, #8EDDB0 75%, #F5E96E 100%);
+    --grad-soft: linear-gradient(150deg, #FBF3A6 0%, #B4EACB 25%, #A6DFF4 50%, #B4EACB 75%, #FBF3A6 100%);
+    --p: 0; /* scroll progress 0 → 1, set by JS */
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: #F4FBE8;
+    color: var(--ink);
+    font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Scroll-driven background ---------- */
+  .bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background: linear-gradient(180deg, #FFF7B8 0%, #D2F3DE 25%, #C2E9F8 50%, #D2F3DE 75%, #FFF7B8 100%);
+    background-size: 100% 300%;
+    background-position: 0 calc(var(--p) * 100%);
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .7; will-change: transform; }
+  .blob.a { width: 46vmax; height: 46vmax; top: -12vmax; left: -10vmax; background: #FFEF8A;
+    transform: translate(calc(var(--p) * 55vw), calc(var(--p) * 45vh)) scale(calc(1 + var(--p) * .5)); }
+  .blob.b { width: 40vmax; height: 40vmax; top: 10vh; right: -12vmax; background: #8FD9F2;
+    transform: translate(calc(var(--p) * -50vw), calc(var(--p) * 70vh)) scale(calc(1.2 - var(--p) * .4)); }
+  .blob.c { width: 36vmax; height: 36vmax; bottom: -14vmax; left: 20vw; background: #9FE3BE;
+    transform: translate(calc(var(--p) * -20vw), calc(var(--p) * -60vh)) scale(calc(.9 + var(--p) * .6)); }
+  .blob.d { width: 26vmax; height: 26vmax; top: 45vh; left: -8vmax; background: #D9F59A;
+    transform: translate(calc(var(--p) * 60vw), calc(var(--p) * -30vh)); }
+
+  /* ---------- Header ---------- */
+  .site-header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 32px;
+    background: rgba(255, 255, 255, .5);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, .75);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 4px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+    transition: transform .15s;
+  }
+  .logo:hover { transform: translateY(-1px); }
+  .logo:focus-visible { outline: 2px solid #0E7C9A; outline-offset: 4px; border-radius: 10px; }
+  .logo img { width: 40px; height: 40px; object-fit: contain; }
+  .logo span { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .site-header .btn { min-height: 44px; padding: 0 22px; }
+
+  /* ---------- Layout ---------- */
+  .page { padding: 24px 24px 96px; display: flex; flex-direction: column; align-items: center; }
+  section { width: 100%; }
+  .center { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  h2 { margin: 0; font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+  .section-sub { margin: 12px 0 0; max-width: 560px; font-size: 17px; line-height: 1.5; color: var(--muted); }
+
+  /* ---------- Hero ---------- */
+  .hero { max-width: 700px; margin-top: 40px; gap: 14px; }
+  .hero .mark { width: clamp(120px, 22vw, 170px); height: auto; }
+  .hero h1 { margin: 0; font-size: clamp(40px, 8vw, 68px); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; }
+  .hero .pitch-title { margin: 6px 0 0; font-size: clamp(20px, 3.4vw, 26px); font-weight: 600; letter-spacing: -0.01em; }
+  .hero p { margin: 0; font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 600px; }
+  .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 14px; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    min-height: 48px; padding: 0 26px; border-radius: 999px;
+    border: 1px solid rgba(23, 42, 46, .85);
+    background: rgba(255, 255, 255, .5); color: var(--ink);
+    font: inherit; font-weight: 600; cursor: pointer;
+    transition: transform .15s, background-color .15s;
+  }
+  .btn:hover { background: rgba(255, 255, 255, .9); transform: translateY(-1px); }
+  .btn:focus-visible { outline: 2px solid #0E7C9A; outline-offset: 3px; }
+  .btn-primary {
+    border-color: transparent; background: var(--grad); background-size: 200% 100%;
+    box-shadow: 0 6px 20px rgba(60, 190, 200, .35);
+  }
+  .btn-primary:hover { background: var(--grad); background-size: 200% 100%; filter: brightness(1.05); }
+
+  /* ---------- Cards ---------- */
+  .card {
+    position: relative; overflow: hidden;
+    padding: 28px 26px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, .85);
+    background: linear-gradient(160deg, rgba(255,255,255,.88), rgba(255,255,255,.52));
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(40, 140, 150, .12);
+  }
+
+  /* ---------- Special ---------- */
+  .special { margin-top: 110px; }
+  .special-grid {
+    width: 100%; max-width: 980px; margin-top: 36px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; text-align: left;
+  }
+  .special-grid .card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; background: var(--grad);
+  }
+  .special-grid h3 { margin: 6px 0 10px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .special-grid p { margin: 0; line-height: 1.55; color: var(--muted); }
+
+  /* ---------- Plans ---------- */
+  .plans-wrap { margin-top: 110px; }
+  .plans {
+    width: 100%; max-width: 1200px; margin-top: 36px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; text-align: left;
+  }
+  .plan { display: flex; flex-direction: column; gap: 16px; }
+  .plan h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .price { font-size: 38px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .price small { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+  .price em { font-style: normal; font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  .plan ul { list-style: none; margin: 0; padding: 0; font-size: 14px; color: var(--muted); }
+  .plan li { padding: 8px 0; border-top: 1px solid rgba(23, 42, 46, .1); }
+  .plan .btn { margin-top: auto; width: 100%; }
+  .badge {
+    align-self: flex-start; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    padding: 4px 10px; border-radius: 99px; background: #fff; color: #0B6B84;
+  }
+  .badge-spacer { height: 24px; }
+  .plan.featured { background: var(--grad-soft); border-color: #fff; box-shadow: 0 18px 44px rgba(60, 190, 200, .35); }
+  .plan.featured .price small, .plan.featured .price em, .plan.featured ul { color: #2F4A4F; }
+  .plan.featured .btn { background: #fff; }
+  .plan.featured .btn:hover { background: #F2FCFF; }
+
+  /* ---------- Reviews ---------- */
+  .reviews { margin-top: 110px; }
+  .review-grid { width: 100%; max-width: 1200px; margin-top: 36px; columns: 3 300px; column-gap: 16px; text-align: left; }
+  .review { margin: 0 0 16px; break-inside: avoid; padding: 28px 26px; }
+  .review::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 5px; background: var(--grad); }
+  .stars { display: flex; gap: 3px; margin-bottom: 12px; }
+  .review blockquote { margin: 0; font-size: 16px; line-height: 1.55; }
+  .who { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-weight: 600; font-size: 17px;
+    background: var(--grad); color: var(--ink);
+    position: relative; overflow: hidden;
+  }
+  .avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+  .who strong { display: block; font-weight: 600; }
+  .who span { font-size: 13px; color: var(--muted); line-height: 1.3; display: block; }
+
+  /* ---------- Footer ---------- */
+  .site-footer {
+    width: 100%; max-width: 1200px; margin-top: 90px; padding-top: 24px;
+    border-top: 1px solid rgba(23, 42, 46, .15);
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+    font-size: 14px; color: var(--muted);
+  }
+  .link {
+    padding: 8px 0; border: 0; background: none; font: inherit; font-size: 14px;
+    color: #0B6B84; text-decoration: underline; cursor: pointer;
+  }
+  .link:hover { color: var(--ink); }
+  .link:focus-visible { outline: 2px solid #0E7C9A; outline-offset: 3px; border-radius: 4px; }
+
+  @media (max-width: 560px) { .site-header { padding: 10px 16px; } }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <div class="blob a"></div>
+  <div class="blob b"></div>
+  <div class="blob c"></div>
+  <div class="blob d"></div>
+</div>
+
+<header class="site-header">
+  <button class="logo" type="button" id="to-top" aria-label="Trendline, back to top">
+    <img src="trendline-logo.png" alt="">
+    <span>Trendline</span>
+  </button>
+  <button class="btn" type="button" data-mock>Log in</button>
+</header>
+
+<div class="page">
+
+  <section class="hero center">
+    <img class="mark" src="trendline-logo.png" alt="Trendline logo">
+    <h1>Follow the trend</h1>
+    <h2 class="pitch-title">More eyes on every post, guaranteed.</h2>
+    <p>Smart algorithms and proven techniques work together to send your social media growth climbing.</p>
+    <div class="actions">
+      <button class="btn btn-primary" type="button" data-mock>Get started</button>
+    </div>
+  </section>
+
+  <section class="special center">
+    <h2>What makes us special</h2>
+    <div class="special-grid">
+      <article class="card">
+        <h3>The Trend Finder™</h3>
+        <p>Our AI watches what is rising across platforms and tells you which trend to jump on next, before it peaks.</p>
+      </article>
+      <article class="card">
+        <h3>Behavioral Orchestration Transformation Services (BOTS)™</h3>
+        <p>A flexible system that lines your content up with how each platform ranks posts, so more people actually see it.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="plans-wrap center" aria-label="Plans">
+    <h2>Our plans</h2>
+    <div class="plans">
+
+      <article class="card plan">
+        <span class="badge-spacer"></span>
+        <h3>🤓 Algorithm Apprentice 🤓</h3>
+        <div class="price"><small>Starting from</small>$80<em> /month</em></div>
+        <ul><li>AI profile optimization</li><li>1 platform</li><li>Light botting</li></ul>
+        <button class="btn" type="button" data-mock>Choose plan</button>
+      </article>
+
+      <article class="card plan">
+        <span class="badge-spacer"></span>
+        <h3>👹 Scroll Goblin 👹</h3>
+        <div class="price"><small>Starting from</small>$500<em> /month</em></div>
+        <ul><li>Everything in 🤓 Algorithm Apprentice 🤓</li><li>2 platforms</li><li>AI content strategy</li><li>Light botting</li></ul>
+        <button class="btn" type="button" data-mock>Choose plan</button>
+      </article>
+
+      <article class="card plan">
+        <span class="badge-spacer"></span>
+        <h3>🔥 Viral King 🔥</h3>
+        <div class="price"><small>Starting from</small>$1,700<em> /month</em></div>
+        <ul><li>Everything in 👹 Scroll Goblin 👹</li><li>3 platforms</li><li>Monthly performance report</li><li>Engagement strategy</li><li>Botting to your liking</li></ul>
+        <button class="btn" type="button" data-mock>Choose plan</button>
+      </article>
+
+      <article class="card plan featured">
+        <span class="badge">Top tier</span>
+        <h3>👑 Viral King Deluxe™ 👑</h3>
+        <div class="price"><small>Starting from</small>$2,500<em> /month</em></div>
+        <ul><li>Everything in 🔥 Viral King 🔥</li><li>∞ platforms</li><li>Direct contact to the team</li><li>Weekly performance reports</li><li>Botting to your liking</li></ul>
+        <button class="btn" type="button" data-mock>Choose plan</button>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="reviews center">
+    <h2>What our clients say</h2>
+    <div class="review-grid">
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“I went from talking to a handful of regulars to a full chat every single night. The Trend Finder called the clip format two weeks before everyone else, and the weekly reports made planning streams easy. Viral King Deluxe is the best money I've put into my channel.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#F5E96E" aria-hidden="true">P<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=PixelRaider&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>PixelRaider</strong><span>Variety gaming streamer · Viral King Deluxe™</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“The Trend Finder pointed me at a clip style right before it took off, and my highlights started getting shared within days. The engagement strategy alone was worth the upgrade.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#8EDDB0" aria-hidden="true">C<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=ClutchQueen&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>ClutchQueen</strong><span>FPS streamer · Viral King</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="4 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#D5DDDD" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“For $80 a month my profile finally looks like a real brand. More local people are finding us, and I didn't have to learn any of the technical side.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#5CC6EA" aria-hidden="true">M<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=MarcusT&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>Marcus T.</strong><span>Bakery owner · Algorithm Apprentice</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“I used to stare at a blank screen on posting days. The content strategy tells me what to make and when, and my numbers have been climbing steadily.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#C4EE8A" aria-hidden="true">N<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=NoodleNinja&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>NoodleNinja</strong><span>Cooking creator · Scroll Goblin</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“The monthly reports are clear and actually useful. I can see which videos worked and why, then plan the next month around it.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#7FD6D9" aria-hidden="true">S<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=SpeedrunSally&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>SpeedrunSally</strong><span>Speedrunner · Viral King</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“Two platforms handled, a clear plan, and no more guessing about hashtags. My class sign-ups went up and I spend less time on my phone.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#FBF3A6" aria-hidden="true">L<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=LenaOrtiz&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>Lena Ortiz</strong><span>Fitness coach · Scroll Goblin</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“Our small community suddenly had a lot more new faces. The team kept adjusting the plan as trends shifted, which I loved.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#A6DFF4" aria-hidden="true">D<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=DiceAndDragons&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>DiceAndDragons</strong><span>Tabletop streamer · Viral King</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="4 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#D5DDDD" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“The profile optimization was a great starting point. My bio, links and posting rhythm all make sense now, and new listeners keep showing up.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#B4EACB" aria-hidden="true">J<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=JaePark&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>Jae Park</strong><span>Indie musician · Algorithm Apprentice</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“Nostalgia content is crowded, but the content strategy helped me find angles nobody else was covering. Worth every dollar at this tier.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#E8EE7A" aria-hidden="true">G<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=GlitchGoblin&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>GlitchGoblin</strong><span>Retro gaming channel · Scroll Goblin</span></div>
+        </figcaption>
+      </figure>
+      <figure class="card review">
+        <div class="stars" role="img" aria-label="5 out of 5 stars"><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg><svg width="18" height="18" viewBox="0 0 24 24" fill="#F2C21B" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg></div>
+        <blockquote>“Having a direct line to the team is the real luxury here. We manage several client accounts, and the weekly reports keep everyone on the same page.”</blockquote>
+        <figcaption class="who">
+          <div class="avatar" style="background:#6FD0C0" aria-hidden="true">B<img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=BrightsideStudio&amp;backgroundColor=f5e96e,8eddb0,5cc6ea,c4ee8a" alt="" loading="lazy" onerror="this.remove()"></div>
+          <div><strong>Brightside Studio</strong><span>Boutique design agency · Viral King Deluxe™</span></div>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <span>© 2026 Trendline. All rights reserved.</span>
+    <button class="link" type="button" data-mock>Terms of Service</button>
+  </footer>
+
+</div>
+
+<script>
+  // Every button is a mock for now.
+  document.querySelectorAll('[data-mock]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      alert("Gulp. This isn't implemented.");
+    });
+  });
+
+  // Logo + title scroll back to the top.
+  document.getElementById('to-top').addEventListener('click', function () {
+    var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+  });
+
+  // Scroll progress (0 at top, 1 at bottom) drives the background.
+  var root = document.documentElement;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ticking = false;
+  function update() {
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    var p = max > 0 ? Math.min(Math.max(window.scrollY / max, 0), 1) : 0;
+    root.style.setProperty('--p', p.toFixed(4));
+    ticking = false;
+  }
+  if (!reduce) {
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+</script>
+</body>
+</html>
